@@ -22,14 +22,18 @@ mongoose.connect(process.env.DB_URI).then(() => {
         logger.info('Connected to the database')
 }).catch((err) => {logger.error('mongo connection error:', err)})
 
+
+
+// Redis Initialization
+
 const redisClient = new Redis(process.env.REDIS_URL)
 
 
 
 //middleware ---------------
 
-app.use(helmet())
-app.use(cors())
+app.use(helmet())  //using helmet security headers
+app.use(cors())    // using cross-origin control
 app.use(express.json())
 
 app.use((req, res, next) => {
@@ -39,10 +43,14 @@ app.use((req, res, next) => {
 })
 
 
-//DDOS Protection and rate limitter  ----------
+//DDOS Protection and ip based rate limiting ----------
+
+//Layer 1
+
 
 const rateLimiter = new RateLimiterRedis({
-    storeClient : redisClient,
+    storeClient : redisClient,    // redis connection----
+
     keyPrefix : 'middleware',
     points : 10,
     duration : 1  //request in 10 seconds
@@ -63,7 +71,9 @@ app.use((req,res , next)=>{
 })
 
 
-//IP based rate-limiting --------------------------------
+//IP based rate-limiting and Layer 2
+// Prevents brute force attacks
+// --------------------------------
 
 const sensitiveratelimit = rateLimit({
     windowMs : 15*60*1000,
