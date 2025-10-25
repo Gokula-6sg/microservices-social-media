@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const {createPost} = require('../controllers/post-controller')
+const {createPost, getAllPost, getPost, deletePost} = require('../controllers/post-controller')
 const {authenticateRequest} = require('../middleware/authMiddle')
 
 
@@ -13,6 +13,9 @@ const {authenticateRequest} = require('../middleware/authMiddle')
 router.use(authenticateRequest)
 
 router.post('/create-post', createPost);
+router.get('/getall-post', getAllPost);
+router.get('/get-post/:id', getPost);
+router.delete('/delete-post/:id', deletePost);
 
 
 
