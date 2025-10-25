@@ -8,6 +8,7 @@ const {RedisStore} = require('rate-limit-redis')
 const logger = require('../src/utils/logger')
 const proxy = require('express-http-proxy')
 const errorHandler = require('../src/middleware/errorHandler')
+const {validateToken} = require("./middleware/authMiddleware");
 
 
 
@@ -60,6 +61,7 @@ const proxyOptions = {
     },
     proxyErrorHandler: (err, res, next)=>{
         logger.error(`Proxy error: ${err.message}`)
+        console.log(err)
         res.status(500).json({
             message : "Internal server error", error: err.message,
         })
@@ -83,6 +85,29 @@ app.use('/v1/auth', proxy(process.env.IDENTITY_SERVICE, {
     }
 }))
 
+//Setting up proxy for the post service   this is more importnant=-------
+app.use('/v1/posts', validateToken, proxy(process.env.POST_SERVICE, {
+    ...proxyOptions,
+    proxyReqOptDecorator : (proxyReqOpts, srcReq) =>{
+        proxyReqOpts.headers["Content-Type"] = "application/json"
+        proxyReqOpts.headers['x-user-id'] = srcReq.user.userId
+
+        return proxyReqOpts
+    },
+    userResDecorator: (proxyRes, proxyResData, userReq, userRes)=>{
+        logger.info(`Respose received from the Post-Service: ${proxyRes.statusCode}`)
+        return proxyResData
+
+    }
+}))
+
+
+
+
+
+
+
+
 
 app.use(errorHandler);
 
@@ -91,6 +116,7 @@ app.use(errorHandler);
 app.listen(PORT, () => {
     logger.info(`Api Gateway is running in the ${PORT}`);
     logger.info(`Identity Service is running in ${process.env.IDENTITY_SERVICE}`);
+    logger.info(`Post Service is running in ${process.env.POST_SERVICE}`);
     logger.info(`Redis Url is  ${process.env.REDIS_URL}`)
 })
 
