@@ -3,6 +3,17 @@ const Post = require("../models/Post");
 const {validateCreatepost} = require("../utils/validation");
 
 
+async function invalidPostcache(req, input){
+
+    const cachedKey = `post:${input}`
+    await req.redisClient.del(cachedKey);
+
+    const keys = await req.redisClient.keys("posts:*");
+    if(keys.length > 0){
+        await req.redisClient.del(keys);
+    }
+}
+
 //Creating New Post.....
 //==================================
 
@@ -29,6 +40,7 @@ const createPost = async (req, res) => {
         })
 
         await newPost.save()
+        await invalidPostcache(req, newPost._id.toString())
         logger.info('Post successfully created')
         res.status(201).json({
             success: true,
@@ -80,6 +92,10 @@ const getAllPost = async (req, res) => {
 
         // Save your posts in redis cache
 
+        await req.redisClient.setex(cacheKey, 300, JSON.stringify(result))
+
+        res.json(result)
+
 
 
 
@@ -93,7 +109,31 @@ const getAllPost = async (req, res) => {
 }
 
 const getPost = async (req, res) => {
+    logger.info("Fetching single post endpoint hitt...");
     try{
+        const postId  = req.params.id;
+        const cachekey = `post:${postId}`
+        const cachedPost = await req.redisClient.get(cachekey);
+
+        if(cachedPost){
+            return res.json(JSON.parse(cachedPost));
+        }
+
+        const PostById = await Post.findById(postId);
+
+
+
+        if(!PostById){
+            return res.status(404).json({
+                success: false,
+                message: 'Post not found'
+            })
+        }
+
+        await req.redisClient.setex(cachedPost, 36000, JSON.stringify(PostById));
+
+        res.json(PostById);
+
 
     }catch(err){
         logger.error("Error creating post post", err);
@@ -104,8 +144,27 @@ const getPost = async (req, res) => {
     }
 }
 
+
+//Deleting the post
+
 const deletePost = async (req, res) => {
     try{
+
+        const post = await Post.findOneAndDelete({
+            _id : req.params.id,
+            user : req.user.userId
+        })
+        if(!post){
+            return res.status(404).json({
+                success: false,
+                message: 'Post not found'
+            })
+        }
+        await invalidPostcache(req, req.params.id);
+        res.json({
+            success: true,
+            message: 'Post successfully deleted',
+        })
 
     }catch(err){
         logger.error("Error deleting post post", err);
@@ -117,4 +176,4 @@ const deletePost = async (req, res) => {
 }
 
 
-module.exports = {createPost}
+module.exports = {createPost, getAllPost, getPost, deletePost}
