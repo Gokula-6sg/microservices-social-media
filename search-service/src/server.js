@@ -20,8 +20,7 @@ mongoose.connect(process.env.DB_URI)
 
 
 
-app.use(helmet())
-//lih
+
 app.use(cors());
 app.use(express.json());
 
